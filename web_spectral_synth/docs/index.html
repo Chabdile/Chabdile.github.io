@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Spectral Synth — Wavetable Demo</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  .wavetable-editor {
+    border: 1px solid #456;
+    padding: 10px;
+    margin-top: 15px;
+    border-radius: 5px;
+    background: #1c2833;
+  }
+  .wavetable-editor h2 {
+    margin-top: 0;
+    font-size: 1.2em;
+    color: #9f8;
+  }
+  .wavetable-editor .row {
+    align-items: center;
+  }
+  #btnGenerateWavetable {
+    background-color: #9f8;
+    color: #123;
+    font-weight: bold;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  #btnGenerateWavetable:hover {
+    background-color: #fff;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Spectral Synth — Wavetable Demo</h1>
+    <p>このデモは <strong>ウェーブテーブル生成</strong>、<strong>リアルタイムエフェクト（ディレイ）</strong>、MIDI入力、プリセット機能を備えています。</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <button id="btnStart">Start / Resume Audio</button>
+      <div class="row">
+        <label>Waveform (Fallback):
+          <select id="waveform">
+            <option value="sine">sine</option>
+            <option value="square">square</option>
+            <option value="sawtooth">sawtooth</option>
+            <option value="triangle">triangle</option>
+          </select>
+        </label>
+
+        <label>Polyphony:
+          <input id="poly" type="number" min="1" max="16" value="6" />
+        </label>
+
+        <label>Attack (ms):
+          <input id="attack" type="range" min="0" max="2000" value="10" />
+        </label>
+
+        <label>Release (ms):
+          <input id="release" type="range" min="0" max="3000" value="300" />
+        </label>
+      </div>
+      
+      <div class="row">
+        <label>Delay Time (ms):
+          <input id="delayTime" type="range" min="0" max="1000" value="0" />
+        </label>
+        <label>Delay Feedback:
+          <input id="delayFeedback" type="range" min="0" max="0.9" step="0.01" value="0" />
+        </label>
+        <label>Delay Mix:
+          <input id="delayMix" type="range" min="0" max="1" step="0.01" value="0" />
+        </label>
+      </div>
+    </section>
+
+    <section class="wavetable-editor">
+      <h2>Wavetable Editor</h2>
+      <div class="row">
+        <label>Base Waveform:
+          <select id="wt_baseWave">
+            <option value="sawtooth">Sawtooth</option>
+            <option value="square">Square</option>
+            <option value="sine">Sine</option>
+          </select>
+        </label>
+        <button id="btnGenerateWavetable">Generate Wavetable</button>
+      </div>
+      <div class="row">
+        <label>Gate: <input id="wt_gate" type="range" min="0" max="1" step="0.01" value="0.0" /></label>
+        <label>Scramble: <input id="wt_scramble" type="range" min="0" max="1" step="0.01" value="0.0" /></label>
+        <label>Tilt: <input id="wt_tilt" type="range" min="-1" max="1" step="0.01" value="0.0" /></label>
+      </div>
+      <div class="row">
+        <label>Magnet Freq (Hz): <input id="wt_magnet_freq" type="number" value="440" /></label>
+        <label>Magnet Force: <input id="wt_magnet_force" type="range" min="-1" max="1" step="0.01" value="0.0" /></label>
+      </div>
+       <div class="row">
+        <label>Quantize Scale:
+          <select id="wt_quantize_scale">
+            <option value="none">None</option>
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+            <option value="pentatonic">Pentatonic</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div class="row">
+        <label>Load Sample (wav/mp3):
+          <input id="sampleFile" type="file" accept="audio/*" />
+        </label>
+        <button id="playSample">Play Sample</button>
+        <button id="stopSample">Stop Sample</button>
+      </div>
+
+      <div class="row">
+        <label>Presets:
+          <select id="presetList"></select>
+        </label>
+        <button id="savePreset">Save Preset</button>
+        <button id="deletePreset">Delete Preset</button>
+        <button id="exportPreset">Export</button>
+        <input id="importPresetFile" type="file" accept="application/json" />
+      </div>
+
+      <div class="row small">
+        <p id="midiStatus">MIDI: checking...</p>
+        <p id="instructions">PC keyboard (Q..P / A..L / Z..M)で演奏できます。MIDI接続がある場合は自動で受信します。</p>
+      </div>
+    </section>
+
+    <section class="analyzer">
+      <canvas id="canvas" width="1000" height="240"></canvas>
+    </section>
+
+    <section class="log">
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>

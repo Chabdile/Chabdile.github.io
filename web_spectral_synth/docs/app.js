@@ -6,8 +6,35 @@ import { PresetManager } from './presetManager.js';
 import { FFT } from './fft.js';
 
 const KEYBOARD_MAP = {
-  'KeyZ': 48, 'KeyS':49, 'KeyX':50, 'KeyD':51, 'KeyC':52, 'KeyV':53, 'KeyG':54, 'KeyB':55, 'KeyH':56, 'KeyN':57, 'KeyJ':58, 'KeyM':59,
-  'KeyQ':60, 'Digit2':61, 'KeyW':62, 'Digit3':63, 'KeyE':64, 'KeyR':65, 'Digit5':66, 'KeyT':67, 'Digit6':68, 'KeyY':69, 'KeyU':70, 'Digit7':71, 'KeyI':72, 'Digit9':73, 'KeyO':74, 'Digit0':75, 'KeyP':76
+  // Bottom row (C4 octave)
+  'KeyZ': 60, // C4
+  'KeyS': 61, // C#4
+  'KeyX': 62, // D4
+  'KeyD': 63, // D#4
+  'KeyC': 64, // E4
+  'KeyV': 65, // F4
+  'KeyG': 66, // F#4
+  'KeyB': 67, // G4
+  'KeyH': 68, // G#4
+  'KeyN': 69, // A4
+  'KeyJ': 70, // A#4
+  'KeyM': 71, // B4
+  'Comma': 72, // C5
+
+  // Top row (C5 octave)
+  'KeyQ': 72, // C5
+  'Digit2': 73, // C#5
+  'KeyW': 74, // D5
+  'Digit3': 75, // D#5
+  'KeyE': 76, // E5
+  'KeyR': 77, // F5
+  'Digit5': 78, // F#5
+  'KeyT': 79, // G5
+  'Digit6': 80, // G#5
+  'KeyY': 81, // A5
+  'Digit7': 82, // A#5
+  'KeyU': 83, // B5
+  'KeyI': 84, // C6
 };
 
 const FFT_SIZE = 2048;
@@ -48,13 +75,22 @@ export class App {
             this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             
             this.masterGain = this.audioCtx.createGain();
-            this.masterGain.gain.value = 0.7;
-            this.masterGain.connect(this.audioCtx.destination);
+            this.masterGain.gain.value = this.state.masterVolume;
+
+            const compressor = this.audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-10, this.audioCtx.currentTime, 0);
+            compressor.knee.setValueAtTime(15, this.audioCtx.currentTime, 0);
+            compressor.ratio.setValueAtTime(12, this.audioCtx.currentTime, 0);
+            compressor.attack.setValueAtTime(0, this.audioCtx.currentTime, 0);
+            compressor.release.setValueAtTime(0.25, this.audioCtx.currentTime, 0);
 
             this.analyser = this.audioCtx.createAnalyser();
             this.analyser.fftSize = FFT_SIZE;
             this.analyser.smoothingTimeConstant = 0.85;
-            this.masterGain.connect(this.analyser);
+
+            this.masterGain.connect(compressor);
+            compressor.connect(this.audioCtx.destination);
+            compressor.connect(this.analyser);
 
             this.synthOutput = this.audioCtx.createGain();
             this._setupDelayEffect();
@@ -118,6 +154,13 @@ export class App {
 
     updateWavetableParams(params) {
         Object.assign(this.state.wavetable, params);
+    }
+
+    updateMasterVolume(volume) {
+        this.state.masterVolume = volume;
+        if (this.masterGain) {
+            this.masterGain.gain.setTargetAtTime(volume, this.audioCtx.currentTime, 0.01);
+        }
     }
 
     // --- Wavetable Generation ---
@@ -360,6 +403,7 @@ export class App {
         };
 
         this.ui.applyPreset(this.state);
+        this.updateMasterVolume(this.state.masterVolume);
         if (this.synth) this.synth.setParams(this.state.synth);
         if (this.audioCtx) {
             this.updateDelayParams(this.state.delay);
@@ -372,6 +416,7 @@ export class App {
 // Default state attached to prototype for easy cloning and resetting
 App.prototype.state = {
     name: 'Default',
+    masterVolume: 0.7,
     synth: { waveform: 'sawtooth', polyphony: 6, attack: 10, release: 300 },
     delay: { time: 0.0, feedback: 0.0, mix: 0.0 },
     wavetable: {

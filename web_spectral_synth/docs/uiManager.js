@@ -5,6 +5,7 @@ export class UIManager {
         this.controller = controller;
         this.elements = {
             btnStart: document.getElementById('btnStart'),
+            masterVolume: document.getElementById('masterVolume'),
             log: document.getElementById('log'),
             canvas: document.getElementById('canvas'),
             midiStatus: document.getElementById('midiStatus'),
@@ -48,6 +49,7 @@ export class UIManager {
 
     _bindEvents() {
         this.elements.btnStart.addEventListener('click', () => this.controller.start());
+        this.elements.masterVolume.addEventListener('input', () => this.controller.updateMasterVolume(parseFloat(this.elements.masterVolume.value)));
 
         // Synth params
         this.elements.waveform.addEventListener('change', () => this.controller.updateSynthParams({ waveform: this.elements.waveform.value }));
@@ -129,6 +131,9 @@ export class UIManager {
     }
 
     applyPreset(preset) {
+        if (preset.masterVolume !== undefined) {
+            this.elements.masterVolume.value = preset.masterVolume;
+        }
         const { synth, delay, wavetable } = preset;
         if (synth) {
             this.elements.waveform.value = synth.waveform;

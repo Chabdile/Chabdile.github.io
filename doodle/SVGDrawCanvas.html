@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible=IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Draw</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: 0;
+        }
+        :root{
+            font-family: "Helvetica Neue" , Arial, "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "メイリオ", Meiryo, "ＭＳ Ｐゴシック", "MS PGothic", sans-serif;
+        }
+
+
+        body {
+            margin: 0 auto;
+            max-width: 800px;
+            background: #eee;
+            align-items: center;
+        }
+        svg {
+            border: 1px solid black;
+            background: #fff;
+            max-width: 800px;
+            max-height: 800px;
+            min-width: 300px;
+            min-height: 300px;
+        }
+        .control-point {
+            fill: blue;
+            stroke: black;
+            stroke-width: 0.2;
+            cursor: pointer;
+        }
+        .curve {
+            stroke: red;
+            fill: none;
+            stroke-width: 1;
+        }
+        .selected {
+            stroke: green;
+        }
+    </style>
+</head>
+<body>
+    <p>SVGで複数の線を描画&編集</p><hr>
+    <button id="deleteButton" disabled>選択した曲線を削除</button>
+    <button id="connectButton">連結モード: OFF</button>
+
+    <svg id="drawingArea" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <script>
+        const deleteButton = document.getElementById('deleteButton')
+        const svg = document.getElementById('drawingArea')
+        const curves = [] // 全ての曲線を格納
+        let currentCurve = null // 現在編集中の曲線
+        let isDragging = null // ドラッグ対象
+        let isClickingControlOrPath = false // 制御点や曲線をクリックしているか
+        let isConnecting = false; // 連結モードの管理
+        let snapIndicator = null; // スナップ可能点を表示するための円
+    
+        // SVG座標変換
+        function getSVGCoordinates(event) {
+            const rect = svg.getBoundingClientRect()
+            const x = ((event.clientX - rect.left) / rect.width) * 100
+            const y = ((event.clientY - rect.top) / rect.height) * 100
+            return { x, y }
+        }
+    
+        // 新しい曲線を追加
+        function addCurve(start, end, control) {
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+            path.setAttribute('class', 'curve')
+            svg.appendChild(path)
+    
+            const controlPoints = ['start', 'control', 'end'].map((type) => {
+                const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+                point.setAttribute('class', 'control-point')
+                point.setAttribute('r', 1)
+                point.dataset.type = type
+                point.dataset.index = curves.length
+                svg.appendChild(point)
+                return point
+            })
+    
+            const curve = { path, controlPoints, points: { start, control, end } }
+            curves.push(curve)
+            updateCurve(curve)
+    
+            // 曲線のイベント
+            path.addEventListener('mouseup', () => {
+                isClickingControlOrPath = true
+                selectCurve(curve)
+            })
+    
+            // 制御点のイベント
+            controlPoints.forEach((point) =>
+                point.addEventListener('mousedown', (event) => {
+                    isClickingControlOrPath = true
+                    isDragging = { curve, type: event.target.dataset.type }
+                })
+            )
+    
+            return curve
+        }
+    
+        // 曲線を更新
+        function updateCurve(curve) {
+            const { path, controlPoints, points } = curve;
+            // 座標を整数に切り捨て
+            const start = { x: Math.floor(points.start.x), y: Math.floor(points.start.y) };
+            const control = { x: Math.floor(points.control.x), y: Math.floor(points.control.y) };
+            const end = { x: Math.floor(points.end.x), y: Math.floor(points.end.y) };
+
+            const d = `M ${start.x},${start.y} Q ${control.x},${control.y} ${end.x},${end.y}`;
+            path.setAttribute('d', d);
+
+            // 制御点の位置を更新
+            Object.keys(points).forEach((key, index) => {
+                controlPoints[index].setAttribute('cx', Math.floor(points[key].x));
+                controlPoints[index].setAttribute('cy', Math.floor(points[key].y));
+            });
+        }
+    
+        // 曲線を選択
+        function selectCurve(curve) {
+            // 既存の選択を解除
+            curves.forEach((c) => {
+                c.path.classList.remove('selected');
+                // 選択されていない曲線の制御点を非表示にする
+                c.controlPoints.forEach((point) => point.setAttribute('visibility', 'hidden'));
+            });
+            // 新しい選択を設定
+            curve.path.classList.add('selected');
+            curve.controlPoints.forEach((point) => point.setAttribute('visibility', 'visible'));
+            currentCurve = curve;
+
+            // 削除ボタンを有効化
+            deleteButton.disabled = false;
+        }
+        
+        // ドラッグ終了
+        svg.addEventListener('mouseup', () => {
+            isDragging = null
+        })
+
+        // ドラッグ中
+        svg.addEventListener('mousemove', (event) => {
+            if (isDragging) {
+                const { x, y } = getSVGCoordinates(event)
+                const { curve, type } = isDragging
+
+                // ドラッグ対象の制御点を更新
+                curve.points[type] = { x, y }
+                updateCurve(curve)
+
+                // // 終点と制御点の操作性改善
+                // if (type === 'end') {
+                //     // 制御点を動的に調整
+                //     curve.points.control.x = (curve.points.start.x + curve.points.end.x) / 2
+                //     curve.points.control.y = (curve.points.start.y + curve.points.end.y) / 2
+                //     updateCurve(curve)
+                // }
+
+                const snapResult = findSnapPoint(x, y);
+
+                if (snapResult) {
+                    // スナップ可能な点が見つかった場合、インジケーターを表示
+                    snapIndicator.setAttribute('cx', snapResult.curve.points[snapResult.point].x);
+                    snapIndicator.setAttribute('cy', snapResult.curve.points[snapResult.point].y);
+                    snapIndicator.setAttribute('visibility', 'visible');
+                } else {
+                    // スナップ候補がない場合は非表示
+                    snapIndicator.setAttribute('visibility', 'hidden');
+                }
+            }
+        })
+    
+        // 制御点クリック防止
+        let clickCount = 0
+        let tempPoints = {}
+        svg.addEventListener('mouseup', (event) => {
+            if (isClickingControlOrPath) {
+                isClickingControlOrPath = false
+                return
+            }
+            const { x, y } = getSVGCoordinates(event)
+            if (clickCount === 0) {
+                tempPoints.start = { x, y }
+                clickCount++
+            } else if (clickCount === 1) {
+                tempPoints.end = { x, y }
+                tempPoints.control = {
+                    x: (tempPoints.start.x + tempPoints.end.x) / 2,
+                    y: (tempPoints.start.y + tempPoints.end.y) / 2,
+                }
+                addCurve(tempPoints.start, tempPoints.end, tempPoints.control)
+                clickCount = 0
+            }
+        })
+    
+        // 削除機能
+        deleteButton.addEventListener('click', () => {
+            if (currentCurve) {
+                // 選択中の曲線を削除
+                svg.removeChild(currentCurve.path)
+                currentCurve.controlPoints.forEach((point) => svg.removeChild(point))
+                const index = curves.indexOf(currentCurve)
+                if (index !== -1) curves.splice(index, 1)
+
+                // 選択状態を解除
+                currentCurve = null
+                deleteButton.disabled = true
+                // ボタンを無効化（曲線が1つもない場合のみ）
+                // deleteButton.disabled = curves.length === 0
+            }
+            // 新規クリック処理を修正して連結を実現
+            if (isConnecting) {
+                const { x, y } = getSVGCoordinates(event);
+                const snapResult = findSnapPoint(x, y);
+
+                if (snapResult && currentCurve) {
+                    // スナップ可能なポイントが見つかった場合、連結を実行
+                    connectCurves(snapResult.curve, snapResult.point, currentCurve, clickCount === 0 ? 'start' : 'end');
+                    clickCount = 0; // 連結後はクリック状態をリセット
+                    isConnecting = false; // 連結モードを終了
+                } else {
+                    // 通常のクリック操作（新しい曲線を作成）
+                    if (clickCount === 0) {
+                        tempPoints.start = { x, y };
+                        clickCount++;
+                    } else if (clickCount === 1) {
+                        tempPoints.end = { x, y };
+                        tempPoints.control = {
+                            x: (tempPoints.start.x + tempPoints.end.x) / 2,
+                            y: (tempPoints.start.y + tempPoints.end.y) / 2,
+                        };
+                        addCurve(tempPoints.start, tempPoints.end, tempPoints.control);
+                        clickCount = 0;
+                    }
+                }
+            }
+        })
+    
+        // 曲線の移動
+        let isMovingCurve = false
+        let initialMousePosition = null
+    
+        svg.addEventListener('mousedown', (event) => {
+            if (currentCurve && event.target === currentCurve.path) {
+                isMovingCurve = true
+                initialMousePosition = getSVGCoordinates(event)
+            }
+        })
+    
+        svg.addEventListener('mouseup', () => {
+            isMovingCurve = false
+        })
+
+        //--------
+        // スナップ範囲内のポイントを検出
+        function findSnapPoint(x, y) {
+            const snapThreshold = 2; // スナップの許容範囲（SVG座標系での単位）
+            for (const curve of curves) {
+                const { start, end } = curve.points;
+                if (Math.abs(start.x - x) < snapThreshold && Math.abs(start.y - y) < snapThreshold) {
+                    return { curve, point: 'start' };
+                }
+                if (Math.abs(end.x - x) < snapThreshold && Math.abs(end.y - y) < snapThreshold) {
+                    return { curve, point: 'end' };
+                }
+            }
+            return null;
+        }
+
+        // 曲線を連結
+        function connectCurves(targetCurve, targetPoint, sourceCurve, sourcePoint) {
+            // 接続先の端点座標を取得
+            const targetCoords = targetCurve.points[targetPoint];
+            // 接続元の端点をスナップ
+            sourceCurve.points[sourcePoint] = { ...targetCoords };
+
+            // 制御点を調整して滑らかに連結
+            if (sourcePoint === 'start') {
+                sourceCurve.points.control = {
+                    x: (sourceCurve.points.start.x + sourceCurve.points.end.x) / 2,
+                    y: (sourceCurve.points.start.y + sourceCurve.points.end.y) / 2,
+                };
+            } else if (sourcePoint === 'end') {
+                targetCurve.points.control = {
+                    x: (targetCurve.points.start.x + targetCurve.points.end.x) / 2,
+                    y: (targetCurve.points.start.y + targetCurve.points.end.y) / 2,
+                };
+            }
+
+            // 曲線を再描画
+            updateCurve(targetCurve);
+            updateCurve(sourceCurve);
+        }
+
+        
+
+        // 連結モードのトグル
+        const connectButton = document.getElementById('connectButton');
+        connectButton.addEventListener('click', () => {
+            isConnecting = !isConnecting;
+            connectButton.textContent = isConnecting ? '連結モード: ON' : '連結モード: OFF';
+        });
+
+        //-------
+
+        // 初期化時にスナップインジケーターを作成
+        function initializeSnapIndicator() {
+            snapIndicator = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            snapIndicator.setAttribute('class', 'snap-indicator');
+            snapIndicator.setAttribute('r', 2); // インジケーターの半径
+            snapIndicator.setAttribute('fill', 'blue');
+            snapIndicator.setAttribute('visibility', 'hidden');
+            svg.appendChild(snapIndicator);
+        }
+
+        // スナップインジケーター初期化呼び出し
+        initializeSnapIndicator();
+
+
+    </script>
+    <!-- <script>
+        //create configs on html by js
+        function makeConfigs() {
+            var container = document.createElement("div")
+            deleteButton.after(container)
+            
+            var colorPicker = document.createElement("input")
+            colorPicker.setAttribute("type", "color")
+            colorPicker.setAttribute("id", "colorPicker")
+            colorPicker.setAttribute("value", "#000000")
+            container.append(colorPicker)
+        }
+        makeConfigs()
+
+        // 初期化処理
+        function init() {
+            // canvas要素を取得
+            var spuit = document.getElementById("colorPicker").value
+        }
+        init()
+    </script> -->
+</body>
+</html>

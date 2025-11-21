@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="generate_dungeon.js" defer></script>
+  <script src="tiles.js" defer></script>
+  <script src="pathfinding.js" defer></script>
+  <script src="enemyAct.js" defer></script>
+  <script src="enemies.js" defer></script>
+  <script src="defineiroiro.js" defer></script>
+  <script src="playerPerspective.js" defer></script>
+  <script src="displayMap.js" defer></script>
+  <script src="config.js" defer></script>
+  <title>Dungeon Generator</title>
+  <style>
+    pre {
+      font-family: monospace;
+      line-height: 1.2em;
+    }
+    canvas {
+      border: 1px solid black;
+      display: block;
+      width: 90vw;
+      margin: auto;
+    }
+    div#dungeon {
+      font-size: 0.5em;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="perspectiveCanvas" width="480" height="240"></canvas>
+  <hr>
+  <canvas id="dungeonCanvas" width="480" height="240"></canvas>
+  <!-- <div id="dungeon"></div> -->
+  <div id="text"></div>
+</body>
+</html>
